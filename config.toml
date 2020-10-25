@@ -1,3 +1,23 @@
-baseURL = "http://example.org/"
+baseURL = "https://blog.beingadityak.com/"
 languageCode = "en-us"
-title = "My New Hugo Site"
+title = "The Ops Blog"
+theme = "hugo-kiera"
+copyright = "Copyright &copy; 2020 - Aditya Krishnakumar"
+canonifyurls = true
+
+paginate = 3
+summaryLength = 30
+enableEmoji = true
+pygmentsCodeFences = true
+
+disqusShortname = "beingadityak"
+
+[author]
+    name = "Aditya Krishnakumar"           #Author name
+    github = "beingadityak"         #Github username
+    linkedin = "beingadityak"       #LinkedIn username
+    twitter = "beingadityak_"        #Twitter username
+
+[params]
+    tagline = "A tech blog for Cloud Admins, by a Cloud Admin"
+    description = "A tech blog from a Cloud Admin about system administration, Cloud technologies and DevOps"
