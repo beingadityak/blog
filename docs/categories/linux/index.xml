@@ -1,0 +1,156 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>linux on The Ops Blog</title><link>https://blog.beingadityak.com/categories/linux/</link><description>Recent content in linux on The Ops Blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><copyright>Copyright &amp;copy; 2020 - Aditya Krishnakumar</copyright><lastBuildDate>Sun, 25 Oct 2020 19:05:44 +0530</lastBuildDate><atom:link href="https://blog.beingadityak.com/categories/linux/index.xml" rel="self" type="application/rss+xml"/><item><title>Setup paid SSL Certificates for your NGINX installation</title><link>https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/</link><pubDate>Sun, 25 Oct 2020 19:10:42 +0530</pubDate><guid>https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/</guid><description>&lt;p>&lt;img src="https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/ssl-certificate.png" alt="SSL Certificate">&lt;/p>
+&lt;h2 id="tldr">TLDR;&lt;/h2>
+&lt;ol>
+&lt;li>
+&lt;p>To generate the certs, create a CSR file with the following:&lt;/p>
+&lt;pre>&lt;code>openssl genrsa -out domain.com.key 2048
+openssl req -new -sha256 -key domain.com.key -out domain.com.cs
+&lt;/code>&lt;/pre>&lt;/li>
+&lt;li>
+&lt;p>Upload the contents of the CSR to your SSL certs provider (in my case, Comodo SSL). It will create an activation file.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Download the same (&lt;strong>don’t change the name in any case!&lt;/strong>) and upload it to your application directory (in my case, &lt;code>/var/www/html&lt;/code>) under &lt;code>.well-known/pki-validation/&amp;lt;PROVIDED_FILE_NAME_IN_TXT_FORMAT&amp;gt;&lt;/code>.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>After the domain is verified, you’ll be provided with the certs in 2 parts - One will be your domain’s cert and the other will be the CA chain. Append both together and upload it to NGINX’s directory (preferably, &lt;code>/etc/nginx/ssl&lt;/code>).&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Configure SSL with thenginx.conf file. After that is complete, restart NGINX and allow port 443 from your firewall/security group. Check your domain and it will be having HTTPS.&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="context">Context&lt;/h2>
+&lt;p>Say you have created an awesome website with a popular CMS and you want to show it to the world. But when you SEO your website, as per &lt;a href="https://support.google.com/webmasters/answer/7451184?hl=en">Google’s guidelines&lt;/a> it recommends you to ensure the website is using HTTPS. You have hosted it on a server, but you have no idea about how to configure HTTPS? This guide is for you.&lt;/p>
+&lt;h2 id="why-not-use-lets-encrypt">Why not use Let&amp;rsquo;s Encrypt?&lt;/h2>
+&lt;p>Let’s Encrypt is a great solution! Even I use it for my websites. But this website was in a production environment and this website is supposed to be used by several thousands of users.&lt;/p>
+&lt;p>Since the nature of Let’s Encrypt is to be used by anyone, attackers can misuse this and can configure SSL on their websites. So there’s a good chance that many corporate environments might have blacklisted this CA from their end. Hence the choice was to use SSL certs from a commercial provider. Besides, with commercial providers, there’s an option to use Business Validation (BV)/Extended Validation (EV), a one step further than the Domain Validation (DV) provided by Let’s Encrypt (&lt;a href="https://www.ssls.com/knowledgebase/what-is-the-difference-between-domain-validation-business-validation-and-extended-validation/">this link&lt;/a> helps provide you the differences).&lt;/p>
+&lt;p>Let’s Encrypt certs are useful if you’re working with personal/small-scale projects or you can’t afford a commercial SSL certificate.&lt;/p>
+&lt;h2 id="pre-requisites">Pre-requisites&lt;/h2>
+&lt;p>To install and configure certs in NGINX, the following tools will be needed:&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>&lt;code>openssl&lt;/code> - It is already installed in your Linux/Mac machine. You can generate the certs in your server as well, but make sure to take a backup of the RSA private key. This will be used to generate the RSA key &amp;amp; CSR request.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>nginx&lt;/code> - This guide is having specific steps for NGINX server, hence it should be installed in your machine.&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;p>&lt;strong>Note:&lt;/strong> This process is for using wildcard SSL certificates with your server so that your multiple sub-domains will be able to use HTTPS and the certificate will become a one-time effort.&lt;/p>
+&lt;h2 id="the-process">The Process&lt;/h2>
+&lt;h3 id="1-create-the-csr-certificate-signing-request-file">1. Create the CSR (Certificate Signing Request) file&lt;/h3>
+&lt;p>To get started with generating CSR (Certificate Signing Request), you need to create an RSA 2048-bit private key.&lt;/p>
+&lt;p>The reason for these many bits is for allowing more secure communication between the server and the client. If we use more number of bits, the server will take some more amount of time for finding out the key chosen by the client for performing encrypted communication.&lt;/p>
+&lt;p>To generate the private key, use the following command:&lt;/p>
+&lt;pre>&lt;code>openssl genrsa -out star_domain_com.key 2048
+&lt;/code>&lt;/pre>&lt;p>This will generate an RSA key of 2048 bits. To verify whether it was an RSA key, the material of the key should start with the following:&lt;/p>
+&lt;pre>&lt;code>-----BEGIN RSA PRIVATE KEY-----
+&lt;/code>&lt;/pre>&lt;p>This verifies that the key generated was of type RSA. Please make a note that this private key will reside on your server. &lt;strong>Never share the contents of your private key anywhere except in your server!&lt;/strong>&lt;/p>
+&lt;p>Also, make sure to take a backup of the private key as it will be needed to renew your paid certificates.&lt;/p>
+&lt;p>Once your private key is generated, the next step is to generate the CSR. This will be uploaded to the Comodo SSL provider.&lt;/p>
+&lt;p>Create a file &lt;code>csr.conf&lt;/code> with the following contents:&lt;/p>
+&lt;pre>&lt;code>[ req ]
+default_bits = 2048
+default_md = sha256
+default_keyfile = star_domain_com.key
+prompt = no
+encrypt_key = no
+distinguished_name = req_distinguished_name
+[ req_distinguished_name ]
+countryName = &amp;quot;COUNTRY_CODE&amp;quot;
+localityName = &amp;quot;LOCATION&amp;quot;
+organizationName = &amp;quot;COMPANY_NAME&amp;quot;
+organizationalUnitName = &amp;quot;DEPT_NAME&amp;quot;
+commonName = &amp;quot;*.domain.com&amp;quot;
+emailAddress = &amp;quot;email@domain.com&amp;quot;
+&lt;/code>&lt;/pre>&lt;p>Make a note of the &lt;code>commonName&lt;/code> section. Since I’m generating a wildcard certificate, I will be providing &lt;code>*.domain.com&lt;/code>. If I don’t use this, Comodo will throw an error saying that the Common Name must be a Wildcard one.&lt;/p>
+&lt;p>Run the following to generate the CSR:&lt;/p>
+&lt;pre>&lt;code>openssl req -config csr.conf -new -key star_domain_com.key -out star_domain_com.csr
+&lt;/code>&lt;/pre>&lt;p>This will generate a &lt;code>star_domain_com.csr&lt;/code> file. Copy its contents and paste it to Comodo’s SSL request page.&lt;/p>
+&lt;h3 id="2-prepare-the-domain-for-validation">2. Prepare the domain for validation&lt;/h3>
+&lt;p>After you paste the contents, there are 3 ways to verify your domain:&lt;/p>
+&lt;ol>
+&lt;li>Using emails registered with the domain&lt;/li>
+&lt;li>HTTP verification or&lt;/li>
+&lt;li>DNS verification.&lt;/li>
+&lt;/ol>
+&lt;p>The DNS verification usually takes one hour and the other two are much faster. For this scenario, I’ll be using the HTTP verification.&lt;/p>
+&lt;p>Comodo will provide a txt file for the same. Don’t change its name as it will be used for verification purposes (To verify whether you own the domain). Upload it to the publicly accessible directory (from where your website is accessible, in my case it&amp;rsquo;s &lt;code>/var/www/html&lt;/code>) under the following directory structure:&lt;/p>
+&lt;pre>&lt;code>/.well-known/pki-validation
+# Create the above like this:
+mkdir -p .well-known/pki-validation
+# For my case, it will look like /var/www/html/.well-known/pki-validation
+&lt;/code>&lt;/pre>&lt;p>Under this directory structure, place the provided text so that it is accessible from your domain as follows:&lt;/p>
+&lt;pre>&lt;code>http://domain.com/.well-known/pki-validation/&amp;lt;TEXT_FILE_NAME&amp;gt;.txt
+&lt;/code>&lt;/pre>&lt;p>Once placed, keep the file under that structure for keeping the domain validation.&lt;/p>
+&lt;h3 id="3-preparing-the-certificates">3. Preparing the certificates&lt;/h3>
+&lt;p>Once this is done, request validation from Comodo. After its validated, you will get a ZIP file in the email. This will contain 2 parts:&lt;/p>
+&lt;ol>
+&lt;li>Your domain’s certificate and&lt;/li>
+&lt;li>the root chain.&lt;/li>
+&lt;/ol>
+&lt;p>Both of these parts are important and will be used for the installation.&lt;/p>
+&lt;p>To install your certs, you need to bundle these 2 parts into a single &amp;ldquo;bundle&amp;rdquo; certificate. You can do this with the following:&lt;/p>
+&lt;pre>&lt;code>cat star_domain_com.crt star_domain_com.ca-bundle &amp;gt; star_domain_com_bundle.crt
+&lt;/code>&lt;/pre>&lt;p>Here, you need to make sure of the order. The first is your domain’s cert and then your subsequent CA certs. Sometimes, Comodo provides you 4 certs. For those certs, you need to follow this order to bundle them together:&lt;/p>
+&lt;pre>&lt;code>cat domain_com.crt SectigoRSADomainValidationSecureServerCA.crt USERTrustRSAAddTrustCA.crt AddTrustExternalCARoot.crt &amp;gt; domain_com_bundle.crt
+&lt;/code>&lt;/pre>&lt;p>Following is the order here:&lt;/p>
+&lt;pre>&lt;code>Domain Cert -&amp;gt; Domain Validation Server CA Cert -&amp;gt; USERTrust RSA Trust CA -&amp;gt; External CA Root Cert
+&lt;/code>&lt;/pre>&lt;p>This step is important so that your browser can determine the validity of the cert through the other certs chained to it. This is called &lt;strong>a chain of trust&lt;/strong>. The browser will go through the cert chain to determine the root CA and with the root CA cert, it will be able to determine that the provided domain cert is correct and valid.&lt;/p>
+&lt;h3 id="4-installing-the-certificates-in-your-server">4. Installing the certificates in your server&lt;/h3>
+&lt;p>The last step of this workflow is to place the certs and the private key (which we used to generate the CSR) in a convenient location so that NGINX can read this and enable it to serve traffic using HTTPS.&lt;/p>
+&lt;ol>
+&lt;li>Make an archive of the bundled certs and the private key and copy the archive to the server.&lt;/li>
+&lt;li>Extract the archive to &lt;code>/etc/nginx/ssl&lt;/code> location.&lt;/li>
+&lt;li>Enable SSL using the following configuration (Use &lt;code>/etc/nginx/conf.d/domain.com.conf&lt;/code> for keeping the configurations clean):
+&lt;pre>&lt;code>server {
+listen 80;
+server_name example.com;
+return 301 https://$host$request_uri;
+}
+server {
+server_name example.com;
+listen 443 ssl default_server;
+ssl on;
+ssl_certificate /etc/nginx/ssl/star_domain_com_bundle.crt;
+ssl_certificate_key /etc/nginx/ssl/star_domain_com.key;
+ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+}
+&lt;/code>&lt;/pre>&lt;/li>
+&lt;/ol>
+&lt;p>With this configuration, you can run HTTPS on your website as well as redirect HTTP requests to HTTPS. Please make sure that you replace the server_name directive to your domain name.&lt;/p>
+&lt;ol start="4">
+&lt;li>Reload NGINX to see the changes.&lt;/li>
+&lt;/ol>
+&lt;h2 id="renewal-instructions">Renewal Instructions&lt;/h2>
+&lt;p>For every renewal, you need to create new CSRs and upload the renewed certs to &lt;code>/etc/nginx/ssl&lt;/code> for keeping customers’ traffic secure.&lt;/p></description></item><item><title>Fix RootFS related errors in your failed EC2 Linux instance</title><link>https://blog.beingadityak.com/posts/fix-rootfs-ec2/</link><pubDate>Sun, 25 Oct 2020 19:05:44 +0530</pubDate><guid>https://blog.beingadityak.com/posts/fix-rootfs-ec2/</guid><description>&lt;p>&lt;img src="https://blog.beingadityak.com/posts/fix-rootfs-ec2/ec2-front.jpeg" alt="Amazon EC2">&lt;/p>
+&lt;h2 id="tldr">TLDR;&lt;/h2>
+&lt;p>If you face the RootFS related issue, try to check whether the AMI was having an older version of the Linux kernel. If it does, chroot into your volume and perform a kernel upgrade. Once done, detach the volume and create an AMI out of it. This will fix the 1/2 status checks issue.&lt;/p>
+&lt;h2 id="context">Context&lt;/h2>
+&lt;p>If you have worked with Amazon EC2 in the past, there might be a chance that sometimes the EC2 instance fails to launch after a fresh start/stop-start of the instance. It even might have happened that you tried to launch from a very old AMI (which someone shared with you/you migrated it from another account) and the instance fails the 2/2 checks thing.&lt;/p>
+&lt;p>The catch-all solution could be to simply terminate the instance and create a new one or maybe create a snapshot first (if that instance contains any database or similar). Sometimes there are some edge cases and the new instance which was recreated also fails the 2/2 checks. I’m discussing one of the scenarios where it fails due to a RootFS mount issue.&lt;/p>
+&lt;h2 id="the-scenario">The scenario&lt;/h2>
+&lt;p>In my case, I was performing a cross-account migration of AMIs between 2 AWS accounts. The instance was an Amazon Linux AMI (2017 version). I created the AMI and launched an instance from it successfully but it failed on the &lt;em>&amp;ldquo;Instance Reachability&amp;rdquo;&lt;/em> status check. I tried to terminate the instance and relaunch a new instance out of the same AMI, thinking it might be something related to the server hardware (sometimes they launch your instance in a degraded hardware) but again it failed the check. I checked on the system log and it said:&lt;/p>
+&lt;pre>&lt;code>Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+&lt;/code>&lt;/pre>&lt;p>This cryptic message means that somehow the instance was unable to mount the EBS volume (in my case my instance type was having an EBS-backed volume).&lt;/p>
+&lt;p>On checking the &lt;strong>&amp;ldquo;Resolution&amp;rdquo;&lt;/strong> section of the &lt;a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/TroubleshootingInstances.html#FilesystemKernel">troubleshooting page&lt;/a> it said the following:&lt;/p>
+&lt;pre>&lt;code>Stop and modify to use modern kernel
+&lt;/code>&lt;/pre>&lt;p>Not really helpful.&lt;/p>
+&lt;h2 id="the-resolution">The resolution&lt;/h2>
+&lt;p>After 10–15 minutes of searching around, I found a SO answer to update the kernel. However, you need to have the access of the system first to update the kernel in the first place.&lt;/p>
+&lt;p>Fortunately enough, my instance-type was having EBS-backed root volumes. So, I stopped the instance, detached it’s volume, created a recovery instance and attached the volume to the recovery instance. Also, make a note that simply attaching the volume to the instance doesn’t mean you can simply start reading from it. You need to create a mount point for your volume. This can be done by simply running these commands (run these from a root-level prompt):&lt;/p>
+&lt;pre>&lt;code>lsblk # To check whether the device is available in system or not
+mkdir /data
+mount /dev/xvdf1 /data # In my case the volume was mounted as /dev/xvdf1. Yours might vary
+&lt;/code>&lt;/pre>&lt;p>After mounting the volume, the challenge was to use the volume. This was possible using the &lt;em>chroot&lt;/em> command. But first, you need to mount the required filesystem directories:&lt;/p>
+&lt;pre>&lt;code>mount -t proc none /data/proc # mount the processes in the volume
+mount --rbind /sys /data/sys # Recursively mount system directories
+mount --rbind /dev /data/dev # recursively mount all devices
+&lt;/code>&lt;/pre>&lt;p>Now, we’re ready to chroot as simple as:&lt;/p>
+&lt;pre>&lt;code>chroot /data /bin/bash
+&lt;/code>&lt;/pre>&lt;p>This will mount your bash shell to your volume’s filesystem as /.&lt;/p>
+&lt;p>Now, the kernel update (This is an Amazon Linux OS) was as simple as:&lt;/p>
+&lt;pre>&lt;code>yum update -y
+yum install -y kernel
+&lt;/code>&lt;/pre>&lt;p>After the kernel was updated, I stopped my recovery instance, safely unmounted the volume and re-attached the volume back to the original instance. After starting the instance, Voila! The failing check passed and thus the day was saved.&lt;/p>
+&lt;h2 id="moral-of-the-story">Moral of the story&lt;/h2>
+&lt;p>Always make sure that you perform kernel upgrades in the regular intervals so that whenever you need an AMI, you know that you’ll be getting an AMI that will atleast not fail due to an outdated kernel.&lt;/p></description></item></channel></rss>
