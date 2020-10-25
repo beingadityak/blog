@@ -12,6 +12,8 @@ pygmentsCodeFences = true
 
 disqusShortname = "beingadityak"
 
+publishDir = "docs"
+
 [author]
     name = "Aditya Krishnakumar"           #Author name
     github = "beingadityak"         #Github username
