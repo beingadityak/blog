@@ -10,7 +10,7 @@ draft = false
 
 ## TLDR;
 
-If you would like to write a basic Systemd service file or a Supervior conf, follow the links [here (systemd)](https://www.google.co.in) and [here (supervisor)](https://www.google.co.in). These contain a basic template of the service file. You can modify the parts of it as per your requirements. Once done, reload the daemons (both supervisor & systemd) and the services will be running.
+If you would like to write a basic Systemd service file or a Supervior conf, follow the links [here (systemd)](https://gist.github.com/beingadityak/ab2e46988cccc0a5e6dd289065551d8d) and [here (supervisor)](https://gist.github.com/beingadityak/c71e157ae79822c3c3587ee427498317). These contain a basic template of the service file. You can modify the parts of it as per your requirements. Once done, reload the daemons (both supervisor & systemd) and the services will be running.
 
 ## Context
 
