@@ -1,4 +1,113 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>nginx on The Ops Blog</title><link>https://blog.beingadityak.com/categories/nginx/</link><description>Recent content in nginx on The Ops Blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><copyright>Copyright &amp;copy; 2020 - Aditya Krishnakumar</copyright><lastBuildDate>Sun, 25 Oct 2020 19:10:42 +0530</lastBuildDate><atom:link href="https://blog.beingadityak.com/categories/nginx/index.xml" rel="self" type="application/rss+xml"/><item><title>Setup paid SSL Certificates for your NGINX installation</title><link>https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/</link><pubDate>Sun, 25 Oct 2020 19:10:42 +0530</pubDate><guid>https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/</guid><description>&lt;p>&lt;img src="https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/ssl-certificate.png" alt="SSL Certificate">&lt;/p>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>nginx on The Ops Blog</title><link>https://blog.beingadityak.com/categories/nginx/</link><description>Recent content in nginx on The Ops Blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><copyright>Copyright &amp;copy; 2020 - Aditya Krishnakumar</copyright><lastBuildDate>Sun, 25 Oct 2020 19:10:42 +0530</lastBuildDate><atom:link href="https://blog.beingadityak.com/categories/nginx/index.xml" rel="self" type="application/rss+xml"/><item><title>Writing effective service files in Linux for your Application</title><link>https://blog.beingadityak.com/posts/effective-service-files/</link><pubDate>Fri, 06 Nov 2020 23:08:58 +0530</pubDate><guid>https://blog.beingadityak.com/posts/effective-service-files/</guid><description>&lt;p>&lt;img src="https://blog.beingadityak.com/posts/effective-service-files/gears.png" alt="Service">&lt;/p>
+&lt;h2 id="tldr">TLDR;&lt;/h2>
+&lt;p>If you would like to write a basic Systemd service file or a Supervior conf, follow the links &lt;a href="https://www.google.co.in">here (systemd)&lt;/a> and &lt;a href="https://www.google.co.in">here (supervisor)&lt;/a>. These contain a basic template of the service file. You can modify the parts of it as per your requirements. Once done, reload the daemons (both supervisor &amp;amp; systemd) and the services will be running.&lt;/p>
+&lt;h2 id="context">Context&lt;/h2>
+&lt;p>Whenever you had a requirement of deploying your application on the server (be it Amazon EC2, Linode instances etc.) the thought of the deployment process always comes in late. You generally tend to use some kind of a hacky solution, such as using &lt;strong>tmux&lt;/strong> for running your application. Granted that it is a great tool but it has a purpose of allowing you to run multiple windows/panels of your terminal. It can also be used for running some background tasks, but it is &lt;em>not really scalable&lt;/em>. You would either run the tmux session manually when you try to horizontally scale your application or come up with a script that automates this for you - which is unnecessary engineering to me.&lt;/p>
+&lt;p>If you&amp;rsquo;re running on Linux instances, well you&amp;rsquo;re in luck! You have 2 options to run your application. You can either use the Linux-native process manager (here I&amp;rsquo;ll be talking about Ubuntu &amp;amp; Debian related one - Systemd) or you use &lt;a href="http://supervisord.org/">Supervisor&lt;/a> which allows you to use a single conf file across Linux systems, as long as the system is having the Supervisor daemon installed (&lt;code>supervisord&lt;/code>)&lt;/p>
+&lt;h2 id="pre-requisites">Pre-requisites&lt;/h2>
+&lt;ol>
+&lt;li>Your application should be executable as a binary or it should have a shell script for starting the appication.&lt;/li>
+&lt;li>The script/binary should be accessible via the root user&lt;/li>
+&lt;li>(Optional) You can have an additional user whose purpose is to execute the application/script&lt;/li>
+&lt;/ol>
+&lt;h2 id="process---the-systemd-way">Process - the SystemD way&lt;/h2>
+&lt;h3 id="1-create-the-service-file">1. Create the service file&lt;/h3>
+&lt;p>You can write the service file (systemd format) for your application with this template:&lt;/p>
+&lt;pre>&lt;code>[Unit]
+Description=&amp;lt;Application/service description&amp;gt;
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+ExecStart=&amp;lt;Binary/shell script location&amp;gt;
+[Install]
+WantedBy=multi-user.target
+&lt;/code>&lt;/pre>&lt;p>This file has multiple parts to be understood. Mainly, any service file is having 3 main sections: &lt;code>[Unit]&lt;/code>, &lt;code>[Service]&lt;/code> and &lt;code>[Install]&lt;/code>. These define the following:&lt;/p>
+&lt;ol>
+&lt;li>&lt;code>[Unit]&lt;/code>: This section helps to create a description of the service, specify the order (using &lt;code>Before&lt;/code> and &lt;code>After&lt;/code> fields), specify the requirements (&lt;code>Requires&lt;/code> field) as well as descibe conflicts for the service (using &lt;code>Conflicts&lt;/code> field.)&lt;/li>
+&lt;li>&lt;code>[Service]&lt;/code>: This section is the main part of a service file. This describes the type; the command to run when starting, stopping and reloading the service.&lt;/li>
+&lt;li>&lt;code>[Install]&lt;/code>: You can define the alias, define the required services to start before this as well as define the services to enable/disable when the user enables/disables the service.&lt;/li>
+&lt;/ol>
+&lt;p>We&amp;rsquo;ll now go over the parts mentioned in the template.&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>Following are the fields which are the part of &lt;code>[Unit]&lt;/code> section in the service file:&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>Description&lt;/code> : The description of the service for which we want to control as a process.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>Following are the fields which are the part of &lt;code>[Service]&lt;/code> section in the service file:&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>Type&lt;/code>: Here we define the type of the service. For the simplicity purposes we keep it as &lt;code>simple&lt;/code>.&lt;/li>
+&lt;li>&lt;code>Restart&lt;/code>: Here we specify whether to restart whenever the application exits with a zero or a non-zero code. We&amp;rsquo;re keeping it to &lt;code>always&lt;/code>.&lt;/li>
+&lt;li>&lt;code>RestartSec&lt;/code>: Here we specify the interval for sleeping before restarting a service. This can be a unit value in seconds or a timespan value such as &lt;code>1min 20s&lt;/code>. Useful when used in conjuction with &lt;code>Restart&lt;/code>.&lt;/li>
+&lt;li>&lt;code>ExecStart&lt;/code>: The name of the script/binary to execute when the service is started.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>Following are the fields which are the part of &lt;code>[Install]&lt;/code> section in the service file:&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>WantedBy&lt;/code>: The current service will be started after the listed service is started. To keep things simple, we&amp;rsquo;re keeping it as &lt;code>multi-user.target&lt;/code>.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>&lt;strong>If you want to deep-dive into the sections and if you have a more complex requirement with the service file, you can use the &lt;a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html">man page for systemd.service&lt;/a> as a reference.&lt;/strong>&lt;/p>
+&lt;h3 id="2-install-and-start-the-service">2. Install and start the service&lt;/h3>
+&lt;ul>
+&lt;li>
+&lt;p>After filling the necessary details for your application in the template shown above, you need to save the above file as &lt;code>&amp;lt;your-app-name&amp;gt;.service&lt;/code> under &lt;code>/lib/systemd/system/&lt;/code>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Once the file is saved, you need to reload the daemon with &lt;code>sudo systemctl daemon-reload&lt;/code> and then start the service with &lt;code>sudo systemctl start &amp;lt;your-app-name&amp;gt;.service&lt;/code>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>(Optional) If you want to keep your service each time the system reboots, run &lt;code>sudo systemctl enable &amp;lt;your-app-name&amp;gt;.service&lt;/code>.&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h2 id="process---the-supervisord-way">Process - The Supervisord way&lt;/h2>
+&lt;p>Supervisord is an awesome way to write service files for your application. This enables you to write a single configuration file which is compatible across multiple OS distributions (Ubuntu, Debian, Fedora, CentOS etc.) as well as Windows! (&lt;strong>&lt;a href="https://stackoverflow.com/questions/7629813/is-there-windows-analog-to-supervisord">although you&amp;rsquo;ll need Cygwin, as described in this SO answer&lt;/a>&lt;/strong>)&lt;/p>
+&lt;p>You also get an internet socket so that you can view and control the processes on a server through a web UI. This opens up opportunities to develop custom UIs for your processes.&lt;/p>
+&lt;h3 id="1-install-the-supervisord-daemon-in-your-os">1. Install the Supervisord daemon in your OS&lt;/h3>
+&lt;p>For Linux-based OSes, it&amp;rsquo;s a straightforward process. You&amp;rsquo;ll need to install supervisord with any of the commands:&lt;/p>
+&lt;pre>&lt;code>apt-get install supervisor -y # For Ubuntu, Debian based OS
+yum install -y supervisor # For CentOS, RHEL based OS
+pip install supervisor # for anything else
+&lt;/code>&lt;/pre>&lt;h3 id="2-generate-the-initial-supervisor-config">2. Generate the initial supervisor config&lt;/h3>
+&lt;p>For most of the installations, you&amp;rsquo;ll have a default config file present in &lt;code>/etc/supervisor/supervisord.conf&lt;/code> for starting and configuring the Supervisord service. If it&amp;rsquo;s not present, you can generate the conf wtih the following:&lt;/p>
+&lt;pre>&lt;code>mkdir -p /etc/supervisor
+echo_supervisord_conf &amp;gt; /etc/supervisor/supervisord.conf
+&lt;/code>&lt;/pre>&lt;h3 id="3-create-the-config-for-your-application">3. Create the config for your application&lt;/h3>
+&lt;p>You can write the config for your application using the following template:&lt;/p>
+&lt;pre>&lt;code>[program:&amp;lt;app-name&amp;gt;]
+command=&amp;lt;Binary/shell-script location&amp;gt;
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/&amp;lt;app-name&amp;gt;.err.log
+stdout_logfile=/var/log/&amp;lt;app-name&amp;gt;.out.log
+&lt;/code>&lt;/pre>&lt;p>&lt;strong>Note&lt;/strong>: This particular config is only for a program that you might want to keep it running in the background. However there are multiple options available if you want to use supervisor as something else (grouping programs, FastCGI programs, event listeners etc.). More information is available from the &lt;a href="http://supervisord.org/configuration.html">docs&lt;/a>&lt;/p>
+&lt;p>This template has a few fields which are needed to be understood first. We&amp;rsquo;ll be going over the parts mentioned:&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>command&lt;/code>: This is the shell script/binary that you want the service to run.&lt;/li>
+&lt;li>&lt;code>autostart&lt;/code>: This means that the program will start automatically whenever supervisord is started.&lt;/li>
+&lt;li>&lt;code>autorestart&lt;/code>: This specifies whether supervisord should restart a process if it exits when it is in the &lt;code>RUNNING&lt;/code> state.&lt;/li>
+&lt;li>&lt;code>stderr_logfile&lt;/code>: The log file location which will be used for logging errors from the application. If the file does not exists, supervisord will create this file automatically&lt;/li>
+&lt;li>&lt;code>stdout_logfile&lt;/code>: The log file location which will be used for logging outputs from the application. If the file does not exists, supervisord will create this file automatically.&lt;/li>
+&lt;/ul>
+&lt;p>If you want to have additional capabilities such as log file rotation, custom user for starting/stopping the process, additional environment variables etc., you can take a look at the &lt;a href="http://supervisord.org/configuration.html#program-x-section-example">full example documented by supervisor&lt;/a>.&lt;/p>
+&lt;h3 id="4-install-and-start-the-service">4. Install and start the service&lt;/h3>
+&lt;ul>
+&lt;li>After modifying the above template for your use-case, save the file at &lt;code>/etc/supervisor/conf.d/&amp;lt;app-name&amp;gt;.conf&lt;/code>.&lt;/li>
+&lt;li>Once the file is saved, reload supervisord with &lt;code>sudo supervisorctl reread&lt;/code>&lt;/li>
+&lt;li>To start the service, run &lt;code>sudo supervisorctl update&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;p>Once the above steps are completed, you can check the status of your service with &lt;code>sudo supervisorctl status all&lt;/code>. You can control the lifecycle of a service with the following:&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>supervisorctl restart &amp;lt;app-name&amp;gt;&lt;/code> - Restart your application&lt;/li>
+&lt;li>&lt;code>supervisorctl start/stop &amp;lt;app-name&amp;gt;&lt;/code> - Start/stop your application&lt;/li>
+&lt;/ul>
+&lt;h2 id="conclusion">Conclusion&lt;/h2>
+&lt;p>With the above mentioned methods, you can now free yourself from managing any tmux/screen sessions for your application and write a service file for the same as well as manually starting applications everytime when the server is rebooted or a new server is created.&lt;/p></description></item><item><title>Setup paid SSL Certificates for your NGINX installation</title><link>https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/</link><pubDate>Sun, 25 Oct 2020 19:10:42 +0530</pubDate><guid>https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/</guid><description>&lt;p>&lt;img src="https://blog.beingadityak.com/posts/paid-ssl-certs-nginx/ssl-certificate.png" alt="SSL Certificate">&lt;/p>
 &lt;h2 id="tldr">TLDR;&lt;/h2>
 &lt;ol>
 &lt;li>
